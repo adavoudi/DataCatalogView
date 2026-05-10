@@ -55,10 +55,10 @@ def create_data_catalog_view(session: boto3.Session) -> None:
     # Step 1: Drop the view if it already exists
     drop_query = f"DROP VIEW IF EXISTS {DATABASE_NAME}.{VIEW_NAME}"
 
-    # print(f"Dropping view {DATABASE_NAME}.{VIEW_NAME} if it exists...")
-    # query_id = run_athena_query(session, drop_query, DATABASE_NAME, ATHENA_WORKGROUP)
-    # wait_for_query(session, query_id)
-    # print(f"View {DATABASE_NAME}.{VIEW_NAME} dropped (or did not exist).")
+    print(f"Dropping view {DATABASE_NAME}.{VIEW_NAME} if it exists...")
+    query_id = run_athena_query(session, drop_query, DATABASE_NAME, ATHENA_WORKGROUP)
+    wait_for_query(session, query_id)
+    print(f"View {DATABASE_NAME}.{VIEW_NAME} dropped (or did not exist).")
     # return
 
     # Step 2: Create the view

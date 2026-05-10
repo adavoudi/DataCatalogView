@@ -43,19 +43,36 @@ resource "aws_lakeformation_permissions" "admin_database" {
 # Grant AdminRole ALL permissions (with grant option) on TABLE resources tagged
 # with any SI value, covering both tables and views (views are TABLE resources
 # in Lake Formation TBAC).
-resource "aws_lakeformation_permissions" "admin_tbac_table" {
+# resource "aws_lakeformation_permissions" "admin_tbac_table" {
+#   principal                     = aws_iam_role.admin.arn
+#   permissions                   = ["ALL"]
+#   permissions_with_grant_option = ["ALL"]
+
+#   lf_tag_policy {
+#     resource_type = "TABLE"
+#     catalog_id    = local.account_id
+
+#     expression {
+#       key    = aws_lakeformation_lf_tag.si_tag.key
+#       values = aws_lakeformation_lf_tag.si_tag.values
+#     }
+#   }
+
+#   depends_on = [
+#     aws_iam_role.admin,
+#     aws_lakeformation_lf_tag.si_tag,
+#   ]
+# }
+
+resource "aws_lakeformation_permissions" "admin_all_tables" {
   principal                     = aws_iam_role.admin.arn
   permissions                   = ["ALL"]
   permissions_with_grant_option = ["ALL"]
 
-  lf_tag_policy {
-    resource_type = "TABLE"
-    catalog_id    = local.account_id
-
-    expression {
-      key    = aws_lakeformation_lf_tag.si_tag.key
-      values = aws_lakeformation_lf_tag.si_tag.values
-    }
+  table {
+    wildcard = true
+    database_name = aws_glue_catalog_database.lakehouse_db.name
+    catalog_id = local.account_id
   }
 
   depends_on = [
