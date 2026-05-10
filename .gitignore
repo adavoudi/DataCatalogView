@@ -1,0 +1,86 @@
+# =============================================================================
+# Terraform
+# =============================================================================
+
+.terraform.lock.hcl
+# Local state files — contain sensitive resource details and should never be committed
+terraform/*.tfstate
+terraform/*.tfstate.*.backup
+terraform/*.tfstate.backup
+
+# Terraform working directory
+terraform/.terraform/
+
+# Terraform lock file is safe to commit, but override files are local-only
+terraform/override.tf
+terraform/override.tf.json
+terraform/*_override.tf
+terraform/*_override.tf.json
+
+# Terraform variable files may contain secrets
+terraform/*.tfvars
+terraform/*.tfvars.json
+
+# Terraform plan output (may contain sensitive values)
+terraform/*.tfplan
+
+# Terraform output JSON — generated from `terraform output -json`, contains ARNs,
+# bucket names, role ARNs, and other infra-specific values
+terraform/terraform_output.json
+scripts/terraform_output.json
+
+# =============================================================================
+# Python
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
+
+# dotenv files — may contain AWS credentials, secrets, or config overrides
+.env
+.env.*
+!.env.example
+
+# AWS credentials (should never be in a repo)
+.aws/
+
+# =============================================================================
+# IDE & Editor
+# =============================================================================
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# Kiro workspace
+# =============================================================================
+
+.kiro/
+
+# =============================================================================
+# OS
+# =============================================================================
+
+.DS_Store
+Thumbs.db
