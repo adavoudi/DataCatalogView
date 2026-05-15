@@ -169,21 +169,66 @@ resource "aws_lakeformation_permissions" "nonsi_tbac_table" {
 # LF-Tag Assignments
 # =============================================================================
 
-# Assign SI=false to the sample_data_view so we can assign tags to it later!
-resource "aws_lakeformation_resource_lf_tags" "view_si_tag" {
-  table {
-    database_name = aws_glue_catalog_database.lakehouse_db.name
-    name          = "sample_data_view"
-    catalog_id    = local.account_id
-  }
+# NOTE: The SI=false tag on sample_data_view is assigned by create_view.py
+# (via lakeformation:AddLFTagsToResource) after the view is created by Athena.
+# It cannot be managed here because the view does not exist at terraform apply
+# time — it is a post-provisioning artifact created by the script.
 
-  lf_tag {
-    key   = aws_lakeformation_lf_tag.si_tag.key
-    value = "false"
+# =============================================================================
+# RedshiftSpectrumRole Permissions
+# =============================================================================
+
+# Grant RedshiftSpectrumRole DESCRIBE on the database so Redshift Spectrum can
+# resolve the external schema against the Glue catalog.
+resource "aws_lakeformation_permissions" "redshift_spectrum_database" {
+  principal   = aws_iam_role.redshift_spectrum.arn
+  permissions = ["DESCRIBE"]
+
+  database {
+    name       = aws_glue_catalog_database.lakehouse_db.name
+    catalog_id = local.account_id
   }
 
   depends_on = [
+    aws_iam_role.redshift_spectrum,
     aws_lakeformation_lf_tag.si_tag,
-    aws_glue_catalog_database.lakehouse_db,
+  ]
+}
+
+# Grant RedshiftSpectrumRole SELECT on all TABLE resources tagged SI=true or SI=false via TBAC.
+resource "aws_lakeformation_permissions" "redshift_spectrum_tbac_table" {
+  principal   = aws_iam_role.redshift_spectrum.arn
+  permissions = ["SELECT"]
+
+  lf_tag_policy {
+    resource_type = "TABLE"
+    catalog_id    = local.account_id
+
+    expression {
+      key    = aws_lakeformation_lf_tag.si_tag.key
+      values = ["true", "false"]
+    }
+  }
+
+  depends_on = [
+    aws_iam_role.redshift_spectrum,
+    aws_lakeformation_lf_tag.si_tag,
+  ]
+}
+
+# Grant RedshiftSpectrumRole ALTER on all tables/views in the database so it can
+# run ALTER EXTERNAL VIEW to register the Redshift dialect on Data Catalog views.
+resource "aws_lakeformation_permissions" "redshift_spectrum_alter_tables" {
+  principal   = aws_iam_role.redshift_spectrum.arn
+  permissions = ["ALTER"]
+
+  table {
+    wildcard      = true
+    database_name = aws_glue_catalog_database.lakehouse_db.name
+    catalog_id    = local.account_id
+  }
+
+  depends_on = [
+    aws_iam_role.redshift_spectrum,
   ]
 }

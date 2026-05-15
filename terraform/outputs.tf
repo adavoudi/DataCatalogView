@@ -42,3 +42,33 @@ output "nonsi_role_arn" {
   description = "ARN of the NonSIRole IAM role"
   value       = aws_iam_role.nonsi.arn
 }
+
+output "redshift_endpoint_address" {
+  description = "Endpoint address of the Redshift Serverless workgroup"
+  value       = aws_redshiftserverless_workgroup.main.endpoint[0].address
+  sensitive   = false
+}
+
+output "redshift_endpoint_port" {
+  description = "Endpoint port of the Redshift Serverless workgroup"
+  value       = aws_redshiftserverless_workgroup.main.endpoint[0].port
+  sensitive   = false
+}
+
+output "redshift_spectrum_role_arn" {
+  description = "ARN of the RedshiftSpectrumRole IAM role"
+  value       = aws_iam_role.redshift_spectrum.arn
+  sensitive   = false
+}
+
+output "redshift_namespace_name" {
+  description = "Name of the Redshift Serverless namespace"
+  value       = aws_redshiftserverless_namespace.main.namespace_name
+  sensitive   = false
+}
+
+output "redshift_workgroup_name" {
+  description = "Name of the Redshift Serverless workgroup"
+  value       = aws_redshiftserverless_workgroup.main.workgroup_name
+  sensitive   = false
+}
