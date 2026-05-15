@@ -324,11 +324,18 @@ conn.autocommit = False  # restore normal mode
 
 Without this, you'll get a cryptic error about the statement not being allowed in a transaction block.
 
-### Lake Formation ALTER Permission for Redshift
+### Lake Formation and IAM Permissions for ALTER EXTERNAL VIEW
 
-For `ALTER EXTERNAL VIEW` to succeed, the RedshiftSpectrumRole needs **Lake Formation `ALTER` permission** on the view. This is in addition to the IAM `glue:UpdateTable` permission.
+For `ALTER EXTERNAL VIEW` to succeed, the RedshiftSpectrumRole needs permissions at two layers:
 
-Here's the catch: if you're using tag-based access control and the view hasn't been tagged yet at the time of the ALTER, a TBAC grant for ALTER won't match. The solution is a direct wildcard grant on the database:
+### Permissions Required for ALTER EXTERNAL VIEW
+
+For `ALTER EXTERNAL VIEW` to succeed, the RedshiftSpectrumRole (the IAM role attached to the namespace) needs two things:
+
+1. **IAM permission**: `glue:UpdateTable` — because the ALTER modifies the view's metadata in the Glue catalog
+2. **Lake Formation permission**: `ALTER` on the view — Lake Formation enforces its own permission layer on top of IAM
+
+Since the view may not be tagged yet at the time of the ALTER (TBAC grants won't match an untagged resource), use a direct wildcard grant:
 
 ```hcl
 resource "aws_lakeformation_permissions" "redshift_spectrum_alter_tables" {
@@ -343,13 +350,52 @@ resource "aws_lakeformation_permissions" "redshift_spectrum_alter_tables" {
 }
 ```
 
-### Security Considerations for ALTER Permission
+### Securing ALTER EXTERNAL VIEW with Redshift Schema Ownership
 
-Granting `ALTER` to the RedshiftSpectrumRole means any Redshift user who can run DDL could potentially modify views. Mitigations:
+Granting `ALTER` to the RedshiftSpectrumRole at the Lake Formation level is necessary, but it doesn't mean every Redshift user can modify views. Redshift has its own access control layer based on **schema ownership**.
 
-1. **One-time setup**: Run `ALTER EXTERNAL VIEW` once during deployment, then remove the `ALTER` LF permission. The dialect persists in the Glue catalog permanently.
-2. **Redshift RBAC**: Restrict which Redshift database users can execute `ALTER EXTERNAL VIEW` statements.
-3. **Scoped grants**: Instead of a wildcard, grant `ALTER` only on the specific view (requires post-deployment scripting since the view doesn't exist at Terraform apply time).
+The recommended approach:
+
+1. **A designated admin user creates the external schema** — this user becomes the schema owner
+2. **Only the schema owner can run DDL** (`ALTER EXTERNAL VIEW`, `CREATE EXTERNAL TABLE`) within that schema
+3. **Other users get only `USAGE` + `SELECT`** — they can query but cannot modify anything
+
+```sql
+-- Admin creates the external schema (becomes owner)
+CREATE EXTERNAL SCHEMA dcv_spectrum
+FROM DATA CATALOG
+DATABASE 'mydb'
+IAM_ROLE 'arn:aws:iam::123456789012:role/RedshiftSpectrumRole'
+CATALOG_ID '123456789012'
+REGION 'us-east-1';
+
+-- Admin registers the Redshift dialect (only owner can do this)
+ALTER EXTERNAL VIEW "dcv_spectrum"."sample_data_view" FORCE AS
+SELECT * FROM "dcv_spectrum"."sample_data";
+
+-- Grant read-only access to analysts
+GRANT USAGE ON SCHEMA dcv_spectrum TO ROLE analyst_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA dcv_spectrum TO ROLE analyst_role;
+```
+
+You can also explicitly transfer ownership if needed:
+
+```sql
+ALTER SCHEMA dcv_spectrum OWNER TO deploy_admin;
+```
+
+This gives you a layered security model:
+
+| Layer | Control | Effect |
+|-------|---------|--------|
+| **Redshift schema ownership** | Only the schema owner can run DDL | Prevents unauthorized users from altering views |
+| **IAM role association** | Only users granted `ASSOCITATE` on the IAM role can reference it | Prevents unauthorized role usage |
+| **Lake Formation ALTER grant** | RedshiftSpectrumRole has ALTER on the database | Allows the Glue catalog update to succeed |
+| **Lake Formation TBAC** | SELECT grants based on SI tags | Controls what data each role can read |
+
+The net effect: even though the RedshiftSpectrumRole has broad ALTER permission at the Lake Formation level, only the Redshift schema owner can actually trigger it. Regular users are limited to querying.
+
+**Reference:** [GRANT (Redshift)](https://docs.aws.amazon.com/redshift/latest/dg/r_GRANT.html)
 
 ---
 
